@@ -1285,6 +1285,31 @@ static int appletb_reset_resume(struct hid_device *hdev)
 
 	return 0;
 }
+
+/*
+ * After s2idle the T1 keeps its power and USB calls resume instead of
+ * reset_resume, but appletb_suspend() turned the bar off either way. resume
+ * also follows every runtime autosuspend, which appletb_suspend() ignores:
+ * only act on interfaces it marked suspended.
+ */
+static int appletb_resume(struct hid_device *hdev)
+{
+	struct appletb_device *tb_dev =
+		appleib_get_drvdata(hid_get_drvdata(hdev), &appletb_hid_driver);
+	struct appletb_report_info *rinfo;
+	unsigned long flags;
+	bool suspended;
+
+	spin_lock_irqsave(&tb_dev->tb_lock, flags);
+	rinfo = appletb_get_report_info(tb_dev, hdev);
+	suspended = rinfo && rinfo->suspended;
+	spin_unlock_irqrestore(&tb_dev->tb_lock, flags);
+
+	if (!suspended)
+		return 0;
+
+	return appletb_reset_resume(hdev);
+}
 #endif
 
 static struct appletb_device *appletb_alloc_device(struct device *log_dev)
@@ -1318,6 +1343,7 @@ static struct hid_driver appletb_hid_driver = {
 	.input_configured = appletb_input_configured,
 #ifdef CONFIG_PM
 	.suspend = appletb_suspend,
+	.resume = appletb_resume,
 	.reset_resume = appletb_reset_resume,
 #endif
 };
