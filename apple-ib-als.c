@@ -252,6 +252,20 @@ static int appleals_hid_event(struct hid_device *hdev, struct hid_field *field,
 	return rc;
 }
 
+/*
+ * Values are pushed from appleals_hid_event(), so the trigger is never polled.
+ * The pollfunc still needs a threaded handler: the IIO core requests its irq
+ * with IRQF_ONESHOT, which genirq warns about without a thread_fn.
+ */
+static irqreturn_t appleals_trigger_handler(int irq, void *p)
+{
+	struct iio_poll_func *pf = p;
+
+	iio_trigger_notify_done(pf->indio_dev->trig);
+
+	return IRQ_HANDLED;
+}
+
 static int appleals_enable_events(struct iio_trigger *trig, bool enable)
 {
 	struct appleals_device *als_dev = iio_trigger_get_drvdata(trig);
@@ -480,7 +494,7 @@ static int appleals_config_iio(struct appleals_device *als_dev)
 	iio_dev->name = "als";
 	iio_dev->modes = INDIO_DIRECT_MODE;
 
-	rc = iio_triggered_buffer_setup(iio_dev, &iio_pollfunc_store_time, NULL,
+	rc = iio_triggered_buffer_setup(iio_dev, NULL, appleals_trigger_handler,
 					NULL);
 	if (rc) {
 		dev_err(als_dev->log_dev,
