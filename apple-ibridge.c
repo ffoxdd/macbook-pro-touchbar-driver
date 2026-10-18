@@ -1013,6 +1013,7 @@ static void appleib_remove(struct acpi_device *acpi)
 	struct appleib_device *ib_dev = acpi_driver_data(acpi);
 
 	hid_unregister_driver(&ib_dev->ib_driver);
+	cleanup_srcu_struct(&ib_dev->lists_srcu);
 
 	return;
 }
