@@ -134,7 +134,9 @@ Tested on a MacBookPro14,2 (13" 2017, four Thunderbolt ports) with Ubuntu 26.04,
   `/etc/udev/rules.d/39-usbmuxd.rules` and drop `|5ac/8600/*` from the line that sets
   `bConfigurationValue="0"`.
 * **Light sensor polling.** The T1 does not send illuminance reports by itself, so
-  `apple-ib-als` polls it while it is in use: `poll_interval` (ms, default 1000, 0 = off).
+  `apple-ib-als` polls it while it is in use: `poll_interval` (ms, default 5000, 0 = off).
+  Each poll wakes the T1; at intervals below the USB autosuspend delay (2 s by default)
+  it never powers down.
 
 ---
 

@@ -49,8 +49,10 @@
  * The T1 never sends illuminance input reports on its own, whatever the
  * reporting state, so poll it while events are enabled. The reply to the
  * GET_REPORT arrives through appleals_hid_event(), which pushes the value.
+ * Each poll wakes the T1, so keep the interval well above the USB
+ * autosuspend delay (2 s by default) or it never powers down.
  */
-static unsigned int appleals_poll_interval = 1000;
+static unsigned int appleals_poll_interval = 5000;
 module_param_named(poll_interval, appleals_poll_interval, uint, 0644);
 MODULE_PARM_DESC(poll_interval, "Illuminance poll interval in ms while the buffer is enabled (0 = no polling; enabling takes effect at the next buffer enable)");
 
