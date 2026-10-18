@@ -131,6 +131,11 @@ static const struct attribute_group appletb_attr_group = {
 	.attrs = appletb_attrs,
 };
 
+struct tb_touch {
+	struct input_dev *input;
+	bool mt_inited;
+};
+
 struct appletb_device {
 	bool			active;
 	struct device		*log_dev;
@@ -203,10 +208,6 @@ static struct hid_driver appletb_hid_driver;
 /* MBP14,3: minimal MT input backport for Touch Bar 'display' mode (6.15–6.16).
  * For 6.17+ upstream HID adds proper MT parsing; this shim remains harmless.
  */
-struct tb_touch {
-	struct input_dev *input;
-	bool mt_inited;
-};
 
 static int __maybe_unused tb_input_init(struct usb_interface *intf, struct tb_touch *tb)
 {
