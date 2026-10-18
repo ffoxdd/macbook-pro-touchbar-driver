@@ -164,7 +164,6 @@ struct appletb_device {
 	unsigned char		cur_tb_disp;
 	unsigned char		pnd_tb_disp;
 	bool			tb_autopm_off;
-	bool			restore_autopm;
 	struct delayed_work	tb_work;
 	/* protects most of the above */
 	spinlock_t		tb_lock;
@@ -330,10 +329,10 @@ static int appletb_set_tb_disp(struct appletb_device *tb_dev,
 
 	/*
 	 * Keep the USB interface powered on while the touch bar display is on
-	 * for better responsiveness.
+	 * for better responsiveness. tb_autopm_off says whether we hold that
+	 * reference: cur_tb_disp is set to off at suspend without dropping it.
 	 */
-	if (disp != APPLETB_CMD_DISP_OFF &&
-	    tb_dev->cur_tb_disp == APPLETB_CMD_DISP_OFF)
+	if (disp != APPLETB_CMD_DISP_OFF && !tb_dev->tb_autopm_off)
 		tb_dev->tb_autopm_off =
 			appletb_disable_autopm(&tb_dev->disp_info);
 
@@ -349,12 +348,9 @@ static int appletb_set_tb_disp(struct appletb_device *tb_dev,
 			"Failed to set touch bar display to %u (%d)\n", disp,
 			rc);
 
-	if (disp == APPLETB_CMD_DISP_OFF &&
-	    tb_dev->cur_tb_disp != APPLETB_CMD_DISP_OFF) {
-		if (tb_dev->tb_autopm_off) {
-			usb_autopm_put_interface(tb_dev->disp_info.usb_iface);
-			tb_dev->tb_autopm_off = false;
-		}
+	if (disp == APPLETB_CMD_DISP_OFF && tb_dev->tb_autopm_off) {
+		usb_autopm_put_interface(tb_dev->disp_info.usb_iface);
+		tb_dev->tb_autopm_off = false;
 	}
 
 	return rc;
@@ -385,7 +381,6 @@ static void appletb_set_tb_worker(struct work_struct *work)
 	unsigned char pending_mode;
 	unsigned char pending_disp;
 	unsigned char current_disp;
-	bool restore_autopm;
 	bool any_tb_key_pressed, need_reschedule;
 	int rc1 = 1, rc2 = 1;
 	unsigned long flags;
@@ -395,7 +390,6 @@ static void appletb_set_tb_worker(struct work_struct *work)
 	/* handle explicit mode-change request */
 	pending_mode = tb_dev->pnd_tb_mode;
 	pending_disp = tb_dev->pnd_tb_disp;
-	restore_autopm = tb_dev->restore_autopm;
 
 	spin_unlock_irqrestore(&tb_dev->tb_lock, flags);
 
@@ -406,9 +400,6 @@ static void appletb_set_tb_worker(struct work_struct *work)
 		msleep(25);
 	if (pending_disp != APPLETB_CMD_DISP_NONE)
 		rc2 = appletb_set_tb_disp(tb_dev, pending_disp);
-
-	if (restore_autopm && tb_dev->tb_autopm_off)
-		appletb_disable_autopm(&tb_dev->disp_info);
 
 	spin_lock_irqsave(&tb_dev->tb_lock, flags);
 
@@ -432,8 +423,6 @@ static void appletb_set_tb_worker(struct work_struct *work)
 			need_reschedule = true;
 	}
 	current_disp = tb_dev->cur_tb_disp;
-
-	tb_dev->restore_autopm = false;
 
 	/* calculate time left to next timeout */
 	if (tb_dev->idle_timeout == -2 || tb_dev->idle_timeout == 0)
@@ -1178,8 +1167,10 @@ static void appletb_remove(struct hid_device *hdev)
 		appletb_set_tb_mode(tb_dev, APPLETB_CMD_MODE_OFF);
 		appletb_set_tb_disp(tb_dev, APPLETB_CMD_DISP_ON);
 
-		if (tb_dev->tb_autopm_off)
+		if (tb_dev->tb_autopm_off) {
 			usb_autopm_put_interface(tb_dev->disp_info.usb_iface);
+			tb_dev->tb_autopm_off = false;
+		}
 
 		appletb_mark_active(tb_dev, false);
 
@@ -1273,7 +1264,6 @@ static int appletb_reset_resume(struct hid_device *hdev)
 	if ((tb_dev->mode_info.hdev && !tb_dev->mode_info.suspended) &&
 	    (tb_dev->disp_info.hdev && !tb_dev->disp_info.suspended)) {
 		tb_dev->active = true;
-		tb_dev->restore_autopm = true;
 		tb_dev->last_event_time = ktime_get();
 
 		appletb_update_touchbar_no_lock(tb_dev, true);
