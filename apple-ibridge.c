@@ -115,17 +115,22 @@ struct appleib_hid_dev_info {
 };
 /* ======================================================================= */
 /* MBP14,3: Touch Bar mode coordinator (6.15+)                              */
-/* - tb_mode=auto|keyboard|display  (default: auto)                         */
+/* - tb_mode=auto|keyboard|display  (default: keyboard)                     */
 /* - prefer_apple_ib=Y to prefer out-of-tree over upstream HID/DRM          */
 /* ======================================================================= */
 
 enum tb_mode apple_tb_mode = TB_MODE_AUTO;
 bool apple_ib_prefer_binding = true;
 
-static char *tb_mode_param = "auto";
+/*
+ * On the T1 (05ac:8600) the "display" configuration is configuration 2 (with
+ * vendor-specific, CDC and audio interfaces besides HID). On a MacBookPro14,2
+ * the Touch Bar works with this driver in configuration 1, the keyboard one.
+ */
+static char *tb_mode_param = "keyboard";
 module_param(tb_mode_param, charp, 0644);
 MODULE_PARM_DESC(tb_mode_param,
-	"Touch Bar mode: auto|keyboard|display (default: auto) — MBP14,3");
+	"Touch Bar mode: auto|keyboard|display (default: keyboard) — MBP14,3");
 
 static bool prefer_apple_ib = true;
 module_param(prefer_apple_ib, bool, 0644);
