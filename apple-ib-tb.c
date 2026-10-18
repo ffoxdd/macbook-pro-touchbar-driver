@@ -1095,20 +1095,22 @@ static int appletb_probe(struct hid_device *hdev,
 		/* MBP14,3: set up an input device for display-mode touches.
 		* NOTE: This only allocates/registers the input device. You still need to
 		*       feed touch samples into it (see tb_handle_touch_report()).
+		* Not in the keyboard configuration (1): there it would only be a
+		* touchscreen that never reports anything.
 		*/
 		{
 			struct usb_interface *intf;
 			int rc_mt;
 
 			intf = appletb_get_usb_iface(tb_dev->disp_info.hdev);
-			if (intf) {
+			if (!intf) {
+				dev_warn(tb_dev->log_dev,
+						"MT: no USB interface for display HID; skipping MT init\n");
+			} else if (interface_to_usbdev(intf)->actconfig->desc.bConfigurationValue != 1) {
 				rc_mt = tb_input_init(intf, &tb_dev->touch);
 				if (rc_mt)
 					dev_warn(tb_dev->log_dev,
 							"MT: input init failed: %d (display mode)\n", rc_mt);
-			} else {
-				dev_warn(tb_dev->log_dev,
-						"MT: no USB interface for display HID; skipping MT init\n");
 			}
 		}
 		#endif
